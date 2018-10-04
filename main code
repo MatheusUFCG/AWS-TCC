@@ -1,0 +1,68 @@
+load('api_config.js');
+load('api_gpio.js');
+load('api_shadow.js');
+load('api_timer.js');
+load('api_sys.js');
+load('api_mqtt.js');
+load('api_net.js');
+load('api_timer.js');
+load('api_math.js'); //for Math.random
+load('api_events.js');
+
+let pubTopic = 'OCF/devices/esp01';
+let teste = 'OCF/rt/oic.r.temperature/esp01';
+let subTopic = 'myTopic/sendPayload';
+let tcc = 'OCF/rt/oic.r.humidity/esp01';
+
+let led = Cfg.get('pins.led');  // Built-in LED GPIO number
+let state = {on: false};        // Device state - LED on/off status
+
+GPIO.set_mode(led, GPIO.MODE_OUTPUT);
+
+//update shadow by flash button (esp)
+let buttonPin = 0;
+GPIO.set_button_handler(buttonPin, GPIO.PULL_UP, GPIO.INT_EDGE_NEG, 200, function() {
+  Shadow.update(0, {uptime: Sys.uptime()});
+}, null);
+
+// event in loop
+
+Timer.set(5000, Timer.REPEAT, function() {
+  let message = JSON.stringify({ 'Resource_ID': 'oic.r.temperature',
+                 'Device_ID' :  Cfg.get('device.id')
+});
+  let ok = MQTT.pub(pubTopic, message, 1);
+  print('Published:', ok);
+  
+  let value = JSON.stringify({
+                "range":"[0.0,100.0]",
+                "units":"C",
+                "temperature":  Math.random() * 100,
+                "id": Cfg.get('device.id'),
+                "rt": "[\"oic.r.temperature\"]"
+  });
+  
+  //using random values as variables, it will change to real values
+  
+  let tcc_value = JSON.stringify({
+                "desiredHumidity":  50,
+                "humidity":         40,
+                "id": Cfg.get('device.id'),
+                "rt": "[\"oic.r.humidity\"]"
+  });
+  
+  let tcc_pub = MQTT.pub(tcc, tcc_value, 1);
+  
+  let teste_pub = MQTT.pub(teste, value, 1);
+  //print('Published:', teste_pub);
+  
+  // AWS shadow update
+  
+  Shadow.update(0, {                      
+                "range":"[0.0,100.0]",
+                "units":"C",
+                "temperature":  Math.random() * 100,
+                "id": "unique_example_id",
+                "rt": "[\"oic.r.temperature\"]"}
+                );
+}, null);
